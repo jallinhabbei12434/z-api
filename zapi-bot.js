@@ -84,13 +84,13 @@ async function enviarWebhook(url, dados) {
 
     if (status === 'bloqueado') {
       console.log('Número bloqueado.');
-      await enviarWebhook(resumeUrl, { disponibilidade: 'lotado', numero });
+      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'lotado', numero });
       await browser.close();
       return;
     }
 
     console.log('Número liberado.');
-    await enviarWebhook(resumeUrl, { disponibilidade: 'ok', numero });
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'ok', numero });
 
     if (status === 'sms') {
       console.log('Botão "Enviar sms" detectado. Clicando...');

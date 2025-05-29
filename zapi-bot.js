@@ -14,7 +14,11 @@ const { chromium } = require('playwright');
       throw new Error('Variáveis de ambiente não carregadas corretamente.');
     }
 
-    const browser = await chromium.launch({ headless: false });
+    const browser = await chromium.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox']
+});
+
     const context = await browser.newContext();
     const page = await context.newPage();
 

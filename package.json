@@ -1,12 +1,12 @@
 {
   "name": "zapi-bot",
   "version": "1.0.0",
-  "main": "bot.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node server.js"
   },
   "dependencies": {
-    "dotenv": "^16.5.0",
-    "playwright": "^1.52.0"
+    "express": "^4.18.2",
+    "dotenv": "^16.5.0"
   }
 }

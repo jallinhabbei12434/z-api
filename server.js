@@ -25,7 +25,7 @@ app.post('/start-bot', (req, res) => {
 
 // NOVO ENDPOINT: preenchimento de código
 app.post('/verify-code', async (req, res) => {
-  const { numero, codigo, resumeUrl } = req.body;
+  const { numero, codigo } = req.body;
   const sessao = sessions.byNumber.get(numero);
 
   if (!sessao) {

@@ -1,5 +1,10 @@
 require('dotenv').config();
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-core');
+
+const browser = await chromium.launch({
+  executablePath: '/usr/bin/chromium', // <-- use o caminho correto
+  headless: false
+});
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const sessions = require('./sessions');

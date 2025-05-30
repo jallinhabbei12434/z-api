@@ -112,14 +112,14 @@ if (await aparece('text=Este número se encontra bloqueado')) {
     if (status === 'bloqueado') {
       console.log('Número bloqueado.');
 process.stdout.write('');
-      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'lotado' });
+      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'lotado', numero });
       await browser.close();
       return;
     }
 
     console.log('Número liberado.');
 process.stdout.write('');
-await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'ok' });
+await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'ok', numero });
 
 if (status === 'sms') {
   try {
@@ -130,7 +130,7 @@ if (status === 'sms') {
     process.stdout.write('');
   } catch (e) {
     console.error('Erro: campo de código não apareceu após clique em Enviar SMS.');
-    await enviarWebhook(process.env.WEBHOOK_COLETA, { disponibilidade: 'lotado' });
+    await enviarWebhook(process.env.WEBHOOK_COLETA, { disponibilidade: 'lotado', numero });
     await browser.close();
     return;
   }

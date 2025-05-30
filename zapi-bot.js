@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { chromium } = require('playwright-core');
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const sessions = require('./sessions');

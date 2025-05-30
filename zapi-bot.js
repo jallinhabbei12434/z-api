@@ -3,7 +3,7 @@ const { chromium } = require('playwright-core');
 
 const browser = await chromium.launch({
   executablePath: '/usr/bin/chromium', // <-- use o caminho correto
-  headless: false
+  headless: true
 });
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));

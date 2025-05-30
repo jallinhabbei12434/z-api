@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-  "postinstall": "npx playwright install chromium",
-    "start": "node server.js"
-  },
+  "postinstall": "npx playwright install chromium && npx playwright install-deps",
+  "start": "node server.js"
+},
   "dependencies": {
     "dotenv": "^16.5.0",
     "express": "^4.21.2",

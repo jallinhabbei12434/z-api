@@ -60,8 +60,11 @@ process.stdout.write('');
 
     console.log('Indo para Instâncias Mobile...');
 process.stdout.write('');
-    await page.goto('https://app.z-api.io/app/devices');
-    await page.waitForSelector('text=Desconectada', { timeout: 3000 });
+    await page.goto('https://app.z-api.io/app/devices', { waitUntil: 'networkidle' });
+await page.waitForLoadState('domcontentloaded'); // opcional extra
+await page.waitForTimeout(1000); // garante que o JS do site executou
+await page.waitForSelector('text=Desconectada', { timeout: 2000 });
+
 
     console.log('Clicando na instância...');
 process.stdout.write('');

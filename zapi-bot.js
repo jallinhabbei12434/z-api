@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { chromium } = require('playwright-core');
+const { chromium } = require('playwright');
 const express = require('express');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const sessions = require('./sessions');
@@ -31,7 +31,6 @@ process.stdout.write('');
     }
 
     const browser = await chromium.launch({
-  executablePath: '/usr/bin/chromium', // caminho usado no Easypanel
   headless: true,
   args: ['--no-sandbox', '--disable-setuid-sandbox']
 });

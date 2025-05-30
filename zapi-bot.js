@@ -15,14 +15,13 @@ async function enviarWebhook(url, dados) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-
 (async () => {
   try {
     const numero = process.argv[2];
     console.log('Iniciando bot...');
+process.stdout.write('');
     console.log('Número do usuário:', numero);
-
-    await enviarWebhook(process.env.WEBHOOK_COLETA, { numero });
+process.stdout.write('');
 
     const email = process.env.ZAPI_EMAIL;
     const senha = process.env.ZAPI_SENHA;
@@ -38,8 +37,17 @@ async function enviarWebhook(url, dados) {
 
     const context = await browser.newContext();
     const page = await context.newPage();
+async function aparece(seletor) {
+  try {
+    await page.waitForSelector(seletor, { timeout: 1500 });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
     console.log('Acessando login...');
+process.stdout.write('');
     await page.goto('https://app.z-api.io/#/login');
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', senha);
@@ -47,19 +55,24 @@ async function enviarWebhook(url, dados) {
     await page.click('button:has-text("Entrar")');
 
     console.log('Login realizado. Aguardando painel carregar...');
+process.stdout.write('');
     await page.waitForTimeout(1000);
 
     console.log('Indo para Instâncias Mobile...');
+process.stdout.write('');
     await page.goto('https://app.z-api.io/app/devices');
     await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
     console.log('Clicando na instância...');
+process.stdout.write('');
     await page.click('a[href*="visualization"]');
 
     console.log('Preenchendo número...');
+process.stdout.write('');
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
 
     console.log('Clicando em Avançar...');
+process.stdout.write('');
     await page.click('button:has-text("Avançar")');
     await page.waitForTimeout(2000);
 
@@ -68,73 +81,97 @@ async function enviarWebhook(url, dados) {
     const codigoInput = 'input[placeholder*="Código de confirmação"]';
 
     let status = null;
-    for (let i = 0; i < 10; i++) {
-      if (await page.$(bloqueioSelector)) {
-        status = 'bloqueado';
-        break;
-      } else if (await page.$(smsBtn)) {
-        status = 'sms';
-        break;
-      } else if (await page.$(codigoInput)) {
-        status = 'wa_old';
-        break;
-      }
-      await page.waitForTimeout(1000);
-    }
+
+if (await aparece('text=Este número se encontra bloqueado')) {
+  status = 'bloqueado';
+} else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+  status = 'wa_old';
+} else if (await aparece('button:has-text("Enviar sms")')) {
+  console.log('Botão "Enviar sms" detectado. Clicando...');
+  process.stdout.write('');
+  await page.click('button:has-text("Enviar sms")');
+
+  console.log('Aguardando reação após clique em Enviar SMS...');
+  process.stdout.write('');
+  await page.waitForTimeout(2000);
+
+  if (await aparece('text=Este número se encontra bloqueado')) {
+    status = 'bloqueado';
+  } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+    status = 'sms';
+  } else {
+    status = 'bloqueado';
+  }
+} else {
+  console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
+  process.stdout.write('');
+  status = 'bloqueado';
+}
+
 
     if (status === 'bloqueado') {
       console.log('Número bloqueado.');
-      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'lotado', numero });
+process.stdout.write('');
+      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'lotado' });
       await browser.close();
       return;
     }
 
     console.log('Número liberado.');
-    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'ok', numero });
+process.stdout.write('');
+await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'ok' });
 
-    if (status === 'sms') {
-      console.log('Botão "Enviar sms" detectado. Clicando...');
-      await page.click(smsBtn);
+if (status === 'sms') {
+  try {
+    console.log('Aguardando campo de código após SMS...');
+    process.stdout.write('');
+    await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
+    console.log('Campo de código detectado após envio de SMS.');
+    process.stdout.write('');
+  } catch (e) {
+    console.error('Erro: campo de código não apareceu após clique em Enviar SMS.');
+    await enviarWebhook(process.env.WEBHOOK_COLETA, { disponibilidade: 'lotado' });
+    await browser.close();
+    return;
+  }
+}
 
-      try {
-        console.log('Aguardando campo de código após SMS...');
-        await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 15000 });
-        console.log('Campo de código detectado após envio de SMS.');
-      } catch (e) {
-        console.error('Erro: campo de código não apareceu após clique em Enviar SMS.');
-        await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { disponibilidade: 'erro_envio_sms', numero });
-        await browser.close();
-        return;
-      }
-    }
 
     sessions.byNumber.set(numero, { browser, page });
 
     const esperaApp = express();
     esperaApp.use(express.json());
 
-    esperaApp.post('/codigo', async (req, res) => {
-      const { code } = req.body;
-      console.log('Código recebido:', code);
+esperaApp.post('/codigo', async (req, res) => {
+  const { numero, code } = req.body;
 
-      try {
-        await page.fill('input[placeholder*="Código"]', code);
-        await page.click('button:has-text("Confirmar")');
-        await page.waitForSelector('text=/Conectad[oa]/', { timeout: 15000 });
+  const sessao = sessions.byNumber.get(numero);
+  if (!sessao) {
+    return res.status(400).send('Sessão não encontrada para esse número');
+  }
 
-        await enviarWebhook(process.env.WEBHOOK_VALIDACAO, { validado: 'true', numero });
-        await browser.close();
-        res.send('Código processado com sucesso');
-        process.exit(0);
-      } catch (e) {
-        console.error('Erro ao preencher código:', e.message);
-        res.status(500).send('Erro ao processar o código');
-      }
-    });
+  const { browser, page } = sessao;
 
-    esperaApp.listen(4000, () => {
-      console.log('Aguardando código em http://localhost:4000/codigo');
-    });
+  console.log('Código recebido:', code);
+  process.stdout.write('');
+
+  try {
+    await page.fill('input[placeholder*="Código"]', code);
+    await page.click('button:has-text("Confirmar")');
+    await page.waitForSelector('text=/Conectad[oa]/', { timeout: 15000 });
+
+    await enviarWebhook(process.env.WEBHOOK_VALIDACAO, { validado: 'true', numero });
+    await browser.close();
+    res.send('Código processado com sucesso');
+    process.exit(0);
+  } catch (e) {
+    console.error('Erro ao preencher código:', e.message);
+    res.status(500).send('Erro ao processar o código');
+  }
+});
+
+
+    
 
   } catch (error) {
     console.error('Erro durante execução do bot:', error.message);

@@ -32,7 +32,7 @@ const instancias = ['3E1CDD745BE3F0858A672ED5B439CBB7']; // substitua pelos IDs 
     });
     process.exit(0);
   }
-
+})();
 const redis = new Redis(process.env.REDIS_URL);
 const app = express();
 app.use(express.json());

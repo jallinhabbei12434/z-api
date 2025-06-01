@@ -6,27 +6,32 @@ const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fet
 const fs = require('fs');
 const path = require('path');
 const Redis = require('ioredis');
+const redis = new Redis(process.env.REDIS_URL);
+const app = express();
+
 const numero = process.argv[2];
 const instancias = ['3E1CDD745BE3F0858A672ED5B439CBB7']; // substitua pelos IDs reais
-let instanciaSelecionada = null;
 
-for (const id of instancias) {
-  const status = await redis.get(`instancia:${id}`);
-  if (status === 'livre') {
-    await redis.set(`instancia:${id}`, numero, 'EX', 240); // trava com número atual por 240s
-    instanciaSelecionada = id;
-    break;
+(async () => {
+  let instanciaSelecionada = null;
+
+  for (const id of instancias) {
+    const status = await redis.get(`instancia:${id}`);
+    if (status === 'livre') {
+      await redis.set(`instancia:${id}`, numero, 'EX', 240); // trava com número atual por 240s
+      instanciaSelecionada = id;
+      break;
+    }
   }
-}
 
-if (!instanciaSelecionada) {
-  await redis.set(`${numero}`, 'lotado', 'EX', 240);
-  await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, {
-    numero,
-    disponibilidade: 'lotado'
-  });
-  process.exit(0);
-}
+  if (!instanciaSelecionada) {
+    await redis.set(`${numero}`, 'lotado', 'EX', 240);
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, {
+      numero,
+      disponibilidade: 'lotado'
+    });
+    process.exit(0);
+  }
 
 const redis = new Redis(process.env.REDIS_URL);
 const app = express();

@@ -1,53 +1,81 @@
+// zapi-bot.js (versão final com login funcional, Redis como fonte de status e TTL de 240s)
 require('dotenv').config();
 const { chromium } = require('playwright');
 const express = require('express');
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-const sessions = require('./sessions');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const fs = require('fs');
+const path = require('path');
+const Redis = require('ioredis');
+const numero = process.argv[2];
+const instancias = ['3E1CDD745BE3F0858A672ED5B439CBB7']; // substitua pelos IDs reais
+let instanciaSelecionada = null;
+
+for (const id of instancias) {
+  const status = await redis.get(`instancia:${id}`);
+  if (status === 'livre') {
+    await redis.set(`instancia:${id}`, numero, 'EX', 240); // trava com número atual por 240s
+    instanciaSelecionada = id;
+    break;
+  }
+}
+
+if (!instanciaSelecionada) {
+  await redis.set(`${numero}`, 'lotado', 'EX', 240);
+  await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, {
+    numero,
+    disponibilidade: 'lotado'
+  });
+  process.exit(0);
+}
+
+const redis = new Redis(process.env.REDIS_URL);
+const app = express();
+app.use(express.json());
+
+const sessions = {}; // Memória temporária por número
+
+function sleep(ms) {
+  return new Promise((res) => setTimeout(res, ms));
+}
 
 async function enviarWebhook(url, dados) {
   try {
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dados)
+      body: JSON.stringify(dados),
     });
   } catch (err) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-(async () => {
+
+app.post('/start-bot', async (req, res) => {
+  const { numero, instanciaId } = req.body;
+  const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+  const instanciaKey = `instancia:${instanciaId}`;
+  const statusKey = `${numero}`;
+
+  const emUso = await redis.get(instanciaKey);
+  if (emUso) {
+    await redis.set(statusKey, 'lotado', 'EX', 240);
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
+    return res.json({ status: 'lotado' });
+  }
+  await redis.set(instanciaKey, numero, 'EX', 240);
+  await redis.set(statusKey, 'pendente', 'EX', 240);
+
+  let browser;
   try {
-    const numero = process.argv[2];
-    console.log('Iniciando bot...');
-process.stdout.write('');
-    console.log('Número do usuário:', numero);
-process.stdout.write('');
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    sessions[numero] = { browser, context, page, instanciaId };
 
     const email = process.env.ZAPI_EMAIL;
     const senha = process.env.ZAPI_SENHA;
 
-    if (!email || !senha) {
-      throw new Error('Variáveis de ambiente não carregadas corretamente.');
-    }
-
-    const browser = await chromium.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox']
-});
-
-    const context = await browser.newContext();
-    const page = await context.newPage();
-async function aparece(seletor) {
-  try {
-    await page.waitForSelector(seletor, { timeout: 1500 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
     console.log('Acessando login...');
-process.stdout.write('');
     await page.goto('https://app.z-api.io/#/login');
     await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', senha);
@@ -55,128 +83,167 @@ process.stdout.write('');
     await page.click('button:has-text("Entrar")');
 
     console.log('Login realizado. Aguardando painel carregar...');
-process.stdout.write('');
     await page.waitForTimeout(1000);
 
     console.log('Indo para Instâncias Mobile...');
-process.stdout.write('');
     await page.goto('https://app.z-api.io/app/devices', { waitUntil: 'networkidle' });
-await page.waitForLoadState('domcontentloaded'); // opcional extra
-await page.waitForTimeout(1000); // garante que o JS do site executou
-await page.waitForSelector('text=Desconectada', { timeout: 2000 });
-
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1000);
+    await page.waitForSelector('text=Desconectada', { timeout: 2000 });
 
     console.log('Clicando na instância...');
-process.stdout.write('');
     await page.click('a[href*="visualization"]');
 
     console.log('Preenchendo número...');
-process.stdout.write('');
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
 
     console.log('Clicando em Avançar...');
-process.stdout.write('');
     await page.click('button:has-text("Avançar")');
     await page.waitForTimeout(2000);
 
-    const bloqueioSelector = 'text=Este número se encontra bloqueado';
-    const smsBtn = 'button:has-text("Enviar sms")';
-    const codigoInput = 'input[placeholder*="Código de confirmação"]';
+    const aparece = async (selector) => {
+      try {
+        await page.waitForSelector(selector, { timeout: 2000 });
+        return true;
+      } catch (_) {
+        return false;
+      }
+    };
 
     let status = null;
 
-if (await aparece('text=Este número se encontra bloqueado')) {
-  status = 'bloqueado';
-} else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-  status = 'wa_old';
-} else if (await aparece('button:has-text("Enviar sms")')) {
-  console.log('Botão "Enviar sms" detectado. Clicando...');
-  process.stdout.write('');
-  await page.click('button:has-text("Enviar sms")');
+    if (await aparece('text=Este número se encontra bloqueado')) {
+      status = 'bloqueado';
+    } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+      status = 'wa_old';
+    } else if (await aparece('button:has-text("Enviar sms")')) {
+      console.log('Botão "Enviar sms" detectado. Clicando...');
+      await page.click('button:has-text("Enviar sms")');
+      console.log('Aguardando reação após clique em Enviar SMS...');
+      await page.waitForTimeout(2000);
 
-  console.log('Aguardando reação após clique em Enviar SMS...');
-  process.stdout.write('');
-  await page.waitForTimeout(2000);
-
-  if (await aparece('text=Este número se encontra bloqueado')) {
-    status = 'bloqueado';
-  } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-    status = 'sms';
-  } else {
-    status = 'bloqueado';
-  }
-} else {
-  console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
-  process.stdout.write('');
-  status = 'bloqueado';
-}
-
+      if (await aparece('text=Este número se encontra bloqueado')) {
+        status = 'bloqueado';
+      } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+        status = 'sms';
+      } else {
+        status = 'bloqueado';
+      }
+    } else {
+      console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
+      status = 'bloqueado';
+    }
 
     if (status === 'bloqueado') {
-      console.log('Número bloqueado.');
-process.stdout.write('');
+      await redis.set(statusKey, 'lotado', 'EX', 240);
+      await redis.del(instanciaKey);
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
       return;
     }
 
-    console.log('Número liberado.');
-process.stdout.write('');
-await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
-
-if (status === 'sms') {
-  try {
-    console.log('Aguardando campo de código após SMS...');
-    process.stdout.write('');
-    await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
-    console.log('Campo de código detectado após envio de SMS.');
-    process.stdout.write('');
-  } catch (e) {
-    console.error('Erro: campo de código não apareceu após clique em Enviar SMS.');
-    await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado' });
-    await browser.close();
-    return;
-  }
-}
-
-
-    sessions.byNumber.set(numero, { browser, page });
-
-    const esperaApp = express();
-    esperaApp.use(express.json());
-
-esperaApp.post('/codigo', async (req, res) => {
-  const { numero, code } = req.body;
-
-  const sessao = sessions.byNumber.get(numero);
-  if (!sessao) {
-    return res.status(400).send('Sessão não encontrada para esse número');
-  }
-
-  const { browser, page } = sessao;
-
-  console.log('Código recebido:', code);
-  process.stdout.write('');
-
-  try {
-    await page.fill('input[placeholder*="Código"]', code);
-    await page.click('button:has-text("Confirmar")');
-    await page.waitForSelector('text=/Conectad[oa]/', { timeout: 15000 });
-
-    await enviarWebhook(process.env.WEBHOOK_VALIDACAO, { validado: 'true', numero });
-    await browser.close();
-    res.send('Código processado com sucesso');
-    process.exit(0);
-  } catch (e) {
-    console.error('Erro ao preencher código:', e.message);
-    res.status(500).send('Erro ao processar o código');
+    if (status === 'sms') {
+      try {
+        await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
+        await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
+        await context.storageState({ path: storageFile });
+        await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
+        res.json({ status: 'aguardando_codigo' });
+      } catch (e) {
+        await redis.set(statusKey, 'erro', 'EX', 240);
+        await redis.del(instanciaKey);
+        await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado', instanciaId });
+        await browser.close();
+        return;
+      }
+    } else {
+      await redis.set(statusKey, 'erro', 'EX', 240);
+      await redis.del(instanciaKey);
+      await browser.close();
+      return;
+    }
+  } catch (err) {
+    console.error('Erro no bot:', err);
+    await redis.set(statusKey, 'erro', 'EX', 240);
+    await redis.del(instanciaKey);
+    res.status(500).json({ erro: true });
   }
 });
 
+app.post('/verify-code', async (req, res) => {
+  const { numero, codigo } = req.body;
+  const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+  const statusKey = `${numero}`;
 
-    
-
-  } catch (error) {
-    console.error('Erro durante execução do bot:', error.message);
+  if (!fs.existsSync(storageFile)) {
+    return res.status(404).json({ erro: 'Sessão não encontrada' });
   }
-})();
+
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({ storageState: storageFile });
+    const page = await context.newPage();
+
+    await page.waitForSelector('input[placeholder*="Código de confirmação"]');
+    await page.fill('input[placeholder*="Código de confirmação"]', codigo);
+    await page.click('button:has-text("Confirmar")');
+
+    await sleep(3000);
+    await redis.set(statusKey, 'ok', 'EX', 240);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('Erro ao verificar código:', err);
+    await redis.set(statusKey, 'erro', 'EX', 240);
+    res.status(500).json({ erro: true });
+  } finally {
+    if (browser) await browser.close();
+  }
+});
+app.post('/resend-code', async (req, res) => {
+  const { numero, instanciaId } = req.body;
+
+  const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+  if (!fs.existsSync(storageFile)) {
+    return res.status(400).json({ erro: 'Sessão não encontrada' });
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ storageState: storageFile });
+  const page = await context.newPage();
+
+  try {
+    await page.goto(`https://painel.z-api.io/app/devices/visualization/${instanciaId}`);
+
+    await page.waitForSelector('span.cursor-pointer:has-text("Alterar")', { timeout: 1500 });
+    await page.click('span.cursor-pointer:has-text("Alterar")');
+
+    await page.waitForSelector('input[type="tel"]', { timeout: 1500 });
+    await page.fill('input[type="tel"]', numero);
+
+    await page.click('button:has-text("Avançar")');
+    await page.waitForTimeout(7000); // garantir que tela carregue
+
+    // Revalidação se chegou à etapa do SMS novamente
+    const campoCodigo = await page.$('input[placeholder*="confirmação"]');
+    if (campoCodigo) {
+      await context.storageState({ path: storageFile });
+      await redis.set(`${numero}`, "aguardando_codigo", "EX", 240);
+      return res.status(200).json({ reenviado: true });
+    } else {
+      await redis.set(`${numero}`, "erro", "EX", 240);
+      return res.status(400).json({ erro: 'Falha ao reenviar código' });
+    }
+  } catch (err) {
+    console.error("Erro no /resend-code:", err.message);
+    await redis.set(`${numero}`, "erro", "EX", 240);
+    return res.status(500).json({ erro: 'Erro ao reenviar' });
+  } finally {
+    await browser.close();
+    await redis.del(`instancia:${instanciaId}`);
+  }
+});
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Servidor do bot rodando...');
+});

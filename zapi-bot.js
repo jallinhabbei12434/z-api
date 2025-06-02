@@ -135,7 +135,8 @@ if (emUso && emUso !== 'livre') {
 });
 
 app.post('/verify-code', async (req, res) => {
-  const { numero, codigo } = req.body;
+  const { numero, codigo, instanciaId } = req.body;
+await redis.set(`instancia:${instanciaId}`, 'livre');
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
   const statusKey = `${numero}`;
 
@@ -159,12 +160,11 @@ app.post('/verify-code', async (req, res) => {
 
     res.json({ status: 'ok' });
   } catch (err) {
-    console.error('Erro ao verificar código:', err);
-    await redis.set(statusKey, 'erro', 'EX', 240);
-    res.status(500).json({ erro: true });
-  } finally {
-    if (browser) await browser.close();
-  }
+  console.error('Erro ao verificar código:', err);
+  await redis.set(statusKey, 'erro', 'EX', 240);
+  await redis.set(`instancia:${instanciaId}`, 'livre'); // ⬅ importante aqui também
+  res.status(500).json({ erro: true });
+}
 });
 
 app.post('/resend-code', async (req, res) => {

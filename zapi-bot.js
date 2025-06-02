@@ -76,10 +76,12 @@ await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Entrar")');
     await page.waitForTimeout(1000);
+await page.screenshot({ path: 'antes-do-devices.png' });
 
     await page.goto('https://app.z-api.io/app/devices');
 await page.waitForLoadState('domcontentloaded');
 await page.waitForTimeout(1000);
+await page.screenshot({ path: 'antes-do-devices2.png' });
 
 // Verifica se a instância desejada está visível
 const instanciaLink = await page.$(`text=${instanciaId}`);

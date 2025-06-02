@@ -7,6 +7,8 @@ const path = require('path');
 const Redis = require('ioredis');
 const redis = new Redis(process.env.REDIS_URL);
 const app = express();
+const instancias = process.env.INSTANCIAS.split(',');
+
 
 app.use(express.json());
 

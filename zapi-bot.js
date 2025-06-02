@@ -77,7 +77,7 @@ await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
     await page.click('button:has-text("Entrar")');
     await page.waitForTimeout(1000);
 
-    await page.goto('https://app.z-api.io/app/devices', { waitUntil: 'networkidle' });
+    await page.goto('https://app.z-api.io/app/devices');
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
     await page.waitForSelector('text=Desconectada', { timeout: 2000 });

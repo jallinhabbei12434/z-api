@@ -246,7 +246,7 @@ app.post('/resend-code', async (req, res) => {
     await redis.del(`instancia:${instanciaId}`);
   }
 });
-
+app.get('/ping', (_,res)=>res.send('pong'));
 app.listen(process.env.PORT || 3000, () => {
   console.log('Servidor do bot rodando...');
 });

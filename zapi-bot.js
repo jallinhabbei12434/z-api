@@ -100,7 +100,7 @@ if (emUso && emUso !== 'livre') {
 
     if (status === 'bloqueado') {
       await redis.set(statusKey, 'lotado', 'EX', 240);
-      await redis.del(instanciaKey);
+     await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
       return;
@@ -155,6 +155,8 @@ app.post('/verify-code', async (req, res) => {
 
     await sleep(3000);
     await redis.set(statusKey, 'ok', 'EX', 240);
+    await redis.set(`instancia:${sessions[numero].instanciaId}`, 'livre');
+
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('Erro ao verificar código:', err);

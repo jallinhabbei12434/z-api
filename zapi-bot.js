@@ -31,15 +31,30 @@ async function enviarWebhook(url, dados) {
 }
 
 app.post('/start-bot', async (req, res) => {
-  const { numero, instanciaId } = req.body;
+  const { numero } = req.body;
+  let instanciaId = null;
+
+  for (const id of instancias) {
+    const status = await redis.get(`instancia:${id}`);
+    if (!status || status === 'livre') {
+      instanciaId = id;
+      break;
+    }
+  }
+
+  if (!instanciaId) {
+    await redis.set(`${numero}`, 'lotado', 'EX', 240);
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
+    return res.json({ status: 'lotado' });
+  }
+
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
   const instanciaKey = `instancia:${instanciaId}`;
   const statusKey = `${numero}`;
 
   const emUso = await redis.get(instanciaKey);
-// ocupado **só** se for diferente de "livre" e não nulo
-if (emUso && emUso !== 'livre') {
-  await redis.set(statusKey, 'lotado', 'EX', 240);
+  if (emUso && emUso !== 'livre') {
+    await redis.set(statusKey, 'lotado', 'EX', 240);
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
@@ -102,7 +117,7 @@ if (emUso && emUso !== 'livre') {
 
     if (status === 'bloqueado') {
       await redis.set(statusKey, 'lotado', 'EX', 240);
-     await redis.set(instanciaKey, 'livre');
+      await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
       return;
@@ -135,6 +150,7 @@ if (emUso && emUso !== 'livre') {
     res.status(500).json({ erro: true });
   }
 });
+
 
 app.post('/verify-code', async (req, res) => {
   const { numero, codigo, instanciaId } = req.body;

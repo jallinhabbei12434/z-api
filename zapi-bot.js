@@ -1,4 +1,3 @@
-// zapi-bot.js (versão final com login funcional, Redis como fonte de status e TTL de 240s)
 require('dotenv').config();
 const { chromium } = require('playwright');
 const express = require('express');
@@ -9,33 +8,9 @@ const Redis = require('ioredis');
 const redis = new Redis(process.env.REDIS_URL);
 const app = express();
 
-const numero = process.argv[2];
-const instancias = ['3E1CDD745BE3F0858A672ED5B439CBB7']; // substitua pelos IDs reais
-
-(async () => {
-  let instanciaSelecionada = null;
-
-  for (const id of instancias) {
-    const status = await redis.get(`instancia:${id}`);
-    if (status === 'livre') {
-      await redis.set(`instancia:${id}`, numero, 'EX', 240); // trava com número atual por 240s
-      instanciaSelecionada = id;
-      break;
-    }
-  }
-
-  if (!instanciaSelecionada) {
-    await redis.set(`${numero}`, 'lotado', 'EX', 240);
-    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, {
-      numero,
-      disponibilidade: 'lotado'
-    });
-    process.exit(0);
-  }
-})();
 app.use(express.json());
 
-const sessions = {}; // Memória temporária por número
+const sessions = {};
 
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms));
@@ -65,6 +40,7 @@ app.post('/start-bot', async (req, res) => {
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
+
   await redis.set(instanciaKey, numero, 'EX', 240);
   await redis.set(statusKey, 'pendente', 'EX', 240);
 
@@ -75,32 +51,20 @@ app.post('/start-bot', async (req, res) => {
     const page = await context.newPage();
     sessions[numero] = { browser, context, page, instanciaId };
 
-    const email = process.env.ZAPI_EMAIL;
-    const senha = process.env.ZAPI_SENHA;
-
-    console.log('Acessando login...');
     await page.goto('https://app.z-api.io/#/login');
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', senha);
+    await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
+    await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
     await page.waitForTimeout(1000);
     await page.click('button:has-text("Entrar")');
-
-    console.log('Login realizado. Aguardando painel carregar...');
     await page.waitForTimeout(1000);
 
-    console.log('Indo para Instâncias Mobile...');
     await page.goto('https://app.z-api.io/app/devices', { waitUntil: 'networkidle' });
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
     await page.waitForSelector('text=Desconectada', { timeout: 2000 });
 
-    console.log('Clicando na instância...');
     await page.click('a[href*="visualization"]');
-
-    console.log('Preenchendo número...');
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
-
-    console.log('Clicando em Avançar...');
     await page.click('button:has-text("Avançar")');
     await page.waitForTimeout(2000);
 
@@ -114,15 +78,12 @@ app.post('/start-bot', async (req, res) => {
     };
 
     let status = null;
-
     if (await aparece('text=Este número se encontra bloqueado')) {
       status = 'bloqueado';
     } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
       status = 'wa_old';
     } else if (await aparece('button:has-text("Enviar sms")')) {
-      console.log('Botão "Enviar sms" detectado. Clicando...');
       await page.click('button:has-text("Enviar sms")');
-      console.log('Aguardando reação após clique em Enviar SMS...');
       await page.waitForTimeout(2000);
 
       if (await aparece('text=Este número se encontra bloqueado')) {
@@ -133,7 +94,6 @@ app.post('/start-bot', async (req, res) => {
         status = 'bloqueado';
       }
     } else {
-      console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
       status = 'bloqueado';
     }
 
@@ -203,10 +163,11 @@ app.post('/verify-code', async (req, res) => {
     if (browser) await browser.close();
   }
 });
+
 app.post('/resend-code', async (req, res) => {
   const { numero, instanciaId } = req.body;
-
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+
   if (!fs.existsSync(storageFile)) {
     return res.status(400).json({ erro: 'Sessão não encontrada' });
   }
@@ -217,17 +178,14 @@ app.post('/resend-code', async (req, res) => {
 
   try {
     await page.goto(`https://painel.z-api.io/app/devices/visualization/${instanciaId}`);
-
     await page.waitForSelector('span.cursor-pointer:has-text("Alterar")', { timeout: 1500 });
     await page.click('span.cursor-pointer:has-text("Alterar")');
 
     await page.waitForSelector('input[type="tel"]', { timeout: 1500 });
     await page.fill('input[type="tel"]', numero);
-
     await page.click('button:has-text("Avançar")');
-    await page.waitForTimeout(7000); // garantir que tela carregue
+    await page.waitForTimeout(7000);
 
-    // Revalidação se chegou à etapa do SMS novamente
     const campoCodigo = await page.$('input[placeholder*="confirmação"]');
     if (campoCodigo) {
       await context.storageState({ path: storageFile });
@@ -246,7 +204,9 @@ app.post('/resend-code', async (req, res) => {
     await redis.del(`instancia:${instanciaId}`);
   }
 });
-app.get('/ping', (_,res)=>res.send('pong'));
-app.listen(process.env.PORT || 3000, () => {
-  console.log('Servidor do bot rodando...');
+
+app.get('/ping', (_, res) => res.send('pong'));
+
+app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+  console.log(`HTTP ON ${process.env.PORT || 3000}`);
 });

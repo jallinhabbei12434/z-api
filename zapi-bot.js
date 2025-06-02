@@ -61,6 +61,7 @@ app.post('/start-bot', async (req, res) => {
 
   await redis.set(instanciaKey, numero, 'EX', 240);
   await redis.set(statusKey, 'pendente', 'EX', 240);
+await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
 
   let browser;
   try {

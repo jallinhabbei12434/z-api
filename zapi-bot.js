@@ -71,14 +71,14 @@ await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
     sessions[numero] = { browser, context, page, instanciaId };
 
     await page.goto('https://app.z-api.io/#/login');
-    await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
-    await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
-    await page.waitForTimeout(1000);
-    await page.click('button:has-text("Entrar")');
-    await page.waitForTimeout(1000);
+await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
+await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
+await page.waitForTimeout(1000);
+await page.click('button:has-text("Entrar")');
+await page.waitForTimeout(1000);
 await page.screenshot({ path: 'antes-do-devices.png' });
 
-    await page.goto('https://app.z-api.io/app/devices');
+await page.goto('https://app.z-api.io/app/devices');
 await page.waitForLoadState('domcontentloaded');
 await page.waitForTimeout(1000);
 await page.screenshot({ path: 'antes-do-devices2.png' });
@@ -87,11 +87,13 @@ await page.screenshot({ path: 'antes-do-devices2.png' });
 const instanciaLink = await page.$(`text=${instanciaId}`);
 if (!instanciaLink) {
   console.error(`❌ Instância ${instanciaId} não encontrada na página da Z-API`);
+  await redis.set(statusKey, 'erro', 'EX', 240);
+  await redis.set(`instancia:${instanciaId}`, 'livre');
   await browser.close();
   return;
 }
 
-// Clicar no <a> pai do <span> com o ID
+// Clica no <a> pai do <span> com o ID
 await instanciaLink.evaluate(el => {
   const link = el.closest('a');
   if (link) link.click();

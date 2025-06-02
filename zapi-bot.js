@@ -82,15 +82,19 @@ await page.waitForLoadState('domcontentloaded');
 await page.waitForTimeout(1000);
 
 // Verifica se a instância desejada está visível
-const instanciaAlvo = await page.$(`a[href*="visualization/${instanciaId}"]`);
-
-if (!instanciaAlvo) {
+const instanciaLink = await page.$(`text=${instanciaId}`);
+if (!instanciaLink) {
   console.error(`❌ Instância ${instanciaId} não encontrada na página da Z-API`);
-  await redis.set(statusKey, 'erro', 'EX', 240);
-  await redis.set(`instancia:${instanciaId}`, 'livre');
   await browser.close();
   return;
 }
+
+// Clicar no <a> pai do <span> com o ID
+await instanciaLink.evaluate(el => {
+  const link = el.closest('a');
+  if (link) link.click();
+});
+
 
 await instanciaAlvo.click();
 

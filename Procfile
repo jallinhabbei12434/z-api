@@ -1,1 +1,1 @@
-web: node zapi-bot.js
+web: node server.js

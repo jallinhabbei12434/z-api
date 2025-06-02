@@ -35,8 +35,9 @@ app.post('/start-bot', async (req, res) => {
   const statusKey = `${numero}`;
 
   const emUso = await redis.get(instanciaKey);
-  if (emUso) {
-    await redis.set(statusKey, 'lotado', 'EX', 240);
+// ocupado **só** se for diferente de "livre" e não nulo
+if (emUso && emUso !== 'livre') {
+  await redis.set(statusKey, 'lotado', 'EX', 240);
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }

@@ -70,7 +70,14 @@ await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
     const context = await browser.newContext();
     const page = await context.newPage();
     sessions[numero] = { browser, context, page, instanciaId };
-
+async function aparece(seletor) {
+  try {
+    await page.waitForSelector(seletor, { timeout: 1500 });
+    return true;
+  } catch {
+    return false;
+  }
+}
     await page.goto('https://app.z-api.io/#/login');
 await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
 await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
@@ -122,25 +129,33 @@ process.stdout.write('');
     let status = null;
     
     if (await aparece('text=Este número se encontra bloqueado')) {
-      status = 'bloqueado';
-    } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-      status = 'wa_old';
-    } else if (await aparece('button:has-text("Enviar sms")')) {
-      await page.click('button:has-text("Enviar sms")');
-      await page.waitForTimeout(2000);
+  status = 'bloqueado';
+} else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+  status = 'wa_old';
+} else if (await aparece('button:has-text("Enviar sms")')) {
+  console.log('Botão "Enviar sms" detectado. Clicando...');
+  process.stdout.write('');
+  await page.click('button:has-text("Enviar sms")');
 
-      if (await aparece('text=Este número se encontra bloqueado')) {
-        status = 'bloqueado';
-      } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-        status = 'sms';
-      } else {
-        status = 'bloqueado';
-      }
-    } else {
-      status = 'bloqueado';
-    }
+  console.log('Aguardando reação após clique em Enviar SMS...');
+  process.stdout.write('');
+  await page.waitForTimeout(2000);
 
+  if (await aparece('text=Este número se encontra bloqueado')) {
+    status = 'bloqueado';
+  } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+    status = 'sms';
+  } else {
+    status = 'bloqueado';
+  }
+} else {
+  console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
+  process.stdout.write('');
+  status = 'bloqueado';
+}
     if (status === 'bloqueado') {
+      console.log('Numero bloquado.');
+      process.stdout.write('');
       await redis.set(statusKey, 'lotado', 'EX', 240);
       await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
@@ -150,15 +165,21 @@ process.stdout.write('');
 
     if (status === 'sms') {
       try {
+        console.log('clicando em SMS.');
+      process.stdout.write('');
         await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
         await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
         await context.storageState({ path: storageFile });
         await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
+        console.log('SMS ENVIADO.');
+      process.stdout.write('');
         res.json({ status: 'aguardando_codigo' });
       } catch (e) {
         await redis.set(statusKey, 'erro', 'EX', 240);
         await redis.del(instanciaKey);
         await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado', instanciaId });
+        console.log('SMS ERRO.');
+      process.stdout.write('');
         await browser.close();
         return;
       }
@@ -201,10 +222,12 @@ await redis.set(`instancia:${instanciaId}`, 'livre');
     await page.waitForSelector('input[placeholder*="Código de confirmação"]');
     await page.fill('input[placeholder*="Código de confirmação"]', codigo);
     await page.click('button:has-text("Confirmar")');
+    console.log('CÓDIGO PREENCHIDO.');
+      process.stdout.write('');
 
     await sleep(3000);
     await redis.set(statusKey, 'ok', 'EX', 240);
-    await redis.set(`instancia:${sessions[numero].instanciaId}`, 'livre');
+    await redis.set(`instancia:${sessions[numero].instanciaId}`, 'conectado');
 
     res.json({ status: 'ok' });
   } catch (err) {

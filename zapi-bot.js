@@ -80,9 +80,9 @@ await page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
-const instanciaLink = await page.locator('span.truncate.mr-2').filter({
-  hasText: '3E1CDD7...'
-}).first();
+const spans = await page.$$('span.truncate.mr-2');
+let instanciaLink;
+
 for (const span of spans) {
   const content = await span.textContent();
   if (content && content.trim() === instanciaId) {
@@ -99,14 +99,7 @@ if (!instanciaLink) {
   return;
 }
 
-// Scrolla e clica
-await instanciaLink.scrollIntoViewIfNeeded();
-await instanciaLink.evaluate(el => {
-  const link = el.closest('a');
-  if (link) link.click();
-});
-
-await instanciaAlvo.click();
+await instanciaLink.click();
 
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
     await page.click('button:has-text("Avançar")');

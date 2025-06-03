@@ -29,12 +29,12 @@ async function enviarWebhook(url, dados) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-async function executarBot(numero, res) {
+
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
   const timeout = 25000; // 25 segundos
-
+async function executarBot(numero, res) {
   try {
     await Promise.race([
       executarBot(numero, res),

@@ -206,7 +206,6 @@ process.stdout.write('');
   throw new Error('Status desconhecido ou nenhum retorno válido');
 }
 });
-}
 
 app.post('/verify-code', async (req, res) => {
   const { numero, codigo } = req.body;

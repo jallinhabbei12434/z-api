@@ -109,14 +109,7 @@ console.log('✅ Clicou no link da instância...');
     console.log('Preenchendo número...');
 process.stdout.write('');
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
-const aparece = async (selector) => {
-      try {
-        await page.waitForSelector(selector, { timeout: 1500 });
-        return true;
-      } catch (_) {
-        return false;
-      }
-    };
+
     console.log('Clicando em Avançar...');
 process.stdout.write('');
     await page.click('button:has-text("Avançar")');

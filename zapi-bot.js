@@ -18,7 +18,11 @@ function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-async function enviarWebhook(url, dados) {
+async function executarBot(numero, res) {
+  let instanciaId = null;
+  let browser;
+}
+
   try {
     await fetch(url, {
       method: 'POST',
@@ -43,10 +47,7 @@ app.post('/start-bot', async (req, res) => {
     console.error('Erro geral:', err.message);
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     res.status(500).json({ erro: true });
-  }
-
-  let instanciaId = null;
-  
+  }  
 
   for (const id of instancias) {
     const status = await redis.get(`instancia:${id}`);

@@ -58,7 +58,7 @@ app.post('/start-bot', async (req, res) => {
 
   if (!instanciaId) {
     await redis.set(`${numero}`, 'lotado', 'EX', 240);
-    await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado' });
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
 
@@ -69,7 +69,7 @@ app.post('/start-bot', async (req, res) => {
   const emUso = await redis.get(instanciaKey);
   if (emUso && emUso !== 'livre') {
     await redis.set(statusKey, 'lotado', 'EX', 240);
-    await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado' });
+    await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
 
@@ -164,7 +164,7 @@ process.stdout.write('');
       process.stdout.write('');
       await redis.set(statusKey, 'lotado', 'EX', 240);
       await redis.set(instanciaKey, 'livre');
-      await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado' });
+      await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
       return;
     }
@@ -176,14 +176,14 @@ process.stdout.write('');
         await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
         await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
         await context.storageState({ path: storageFile });
-        await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'ok' });
+        await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
         console.log('SMS ENVIADO.');
       process.stdout.write('');
         res.json({ status: 'aguardando_codigo' });
       } catch (e) {
         await redis.set(statusKey, 'erro', 'EX', 240);
         await redis.del(instanciaKey);
-        await enviarWebhook(process.env.WEBHOOK_COLETA, { numero, disponibilidade: 'lotado', instanciaId });
+        await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado', instanciaId });
         console.log('SMS ERRO.');
       process.stdout.write('');
         await browser.close();

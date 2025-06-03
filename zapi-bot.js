@@ -45,7 +45,9 @@ app.post('/start-bot', async (req, res) => {
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     res.status(500).json({ erro: true });
   }
+async function executarBot(numero, res) {
   let instanciaId = null;
+  let browser;
   
 
   for (const id of instancias) {
@@ -166,7 +168,8 @@ process.stdout.write('');
       await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
-      return;
+      return res.json({ status: 'bloqueado' });
+      
     }
 
     if (status === 'sms') {
@@ -179,7 +182,7 @@ process.stdout.write('');
         await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
         console.log('SMS ENVIADO.');
       process.stdout.write('');
-        res.json({ status: 'aguardando_codigo' });
+        return res.json({ status: 'aguardando_codigo' });
       } catch (e) {
         await redis.set(statusKey, 'erro', 'EX', 240);
         await redis.del(instanciaKey);
@@ -187,13 +190,13 @@ process.stdout.write('');
         console.log('SMS ERRO.');
       process.stdout.write('');
         await browser.close();
-        return;
+        return res.json({ status: 'bloqueado' }); // 🔁 Se bloqueado, avisa também
       }
     } else {
       await redis.set(statusKey, 'erro', 'EX', 240);
       await redis.del(instanciaKey);
       await browser.close();
-      return;
+      return res.json({ status: 'bloqueado' });;
     }
   } catch (err) {
     console.error('Erro no bot:', err);
@@ -201,6 +204,8 @@ process.stdout.write('');
     await redis.del(instanciaKey);
     res.status(500).json({ erro: true });
   }
+  throw new Error('Status desconhecido ou nenhum retorno válido');
+}
 });
 
 

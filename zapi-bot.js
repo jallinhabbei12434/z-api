@@ -32,6 +32,19 @@ async function enviarWebhook(url, dados) {
 
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
+
+  const timeout = 25000; // 25 segundos
+
+  try {
+    await Promise.race([
+      executarBot(numero, res),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('⏰ Timeout de execução')), timeout))
+    ]);
+  } catch (err) {
+    console.error('Erro geral:', err.message);
+    await redis.set(`${numero}`, 'erro', 'EX', 240);
+    res.status(500).json({ erro: true });
+  }
   let instanciaId = null;
   
 

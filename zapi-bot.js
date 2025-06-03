@@ -82,7 +82,7 @@ await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 await page.waitForSelector(`span.truncate.mr-2:has-text("${instanciaId}")`, { timeout: 3000 });
 
 console.log('🔎 Buscando link da instância...');
-const linkInstancia = await page.$(`a[href*="visualization/${instanciaId}"]`);
+const linkInstancia = await page.click(`a[href*="visualization/${instanciaId}"]`);
 if (!linkInstancia) {
   console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);
   await redis.set(statusKey, 'erro', 'EX', 240);

@@ -33,6 +33,7 @@ async function enviarWebhook(url, dados) {
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
   let instanciaId = null;
+  
 
   for (const id of instancias) {
     const status = await redis.get(`instancia:${id}`);
@@ -73,18 +74,19 @@ await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
     await page.goto('https://app.z-api.io/#/login');
 await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
 await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
-await page.waitForTimeout(1000);
 await page.click('button:has-text("Entrar")');
-await page.waitForTimeout(1000);
-await page.screenshot({ path: 'antes-do-devices.png' });
+await page.waitForNavigation({ waitUntil: 'networkidle' });
 
 await page.goto('https://app.z-api.io/app/devices');
-await page.waitForLoadState('domcontentloaded');
-await page.waitForTimeout(1000);
-await page.screenshot({ path: 'antes-do-devices2.png' });
+await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
 // Verifica se a instância desejada está visível
-const instanciaLink = await page.$(`text=${instanciaId}`);
+await instanciaLink.scrollIntoViewIfNeeded(); // scrolla até o span
+await instanciaLink.screenshot({ path: `debug-span.png` });
+
+const instanciaLink = await page.locator('span.truncate').filter({
+  hasText: instanciaId.slice(0, 6) // pega os primeiros 6~8 caracteres visíveis
+}).first();
 if (!instanciaLink) {
   console.error(`❌ Instância ${instanciaId} não encontrada na página da Z-API`);
   await redis.set(statusKey, 'erro', 'EX', 240);
@@ -92,6 +94,12 @@ if (!instanciaLink) {
   await browser.close();
   return;
 }
+
+await instanciaLink.evaluate(el => {
+  const link = el.closest('a');
+  if (link) link.click();
+});
+
 
 // Clica no <a> pai do <span> com o ID
 await instanciaLink.evaluate(el => {
@@ -173,7 +181,12 @@ await instanciaAlvo.click();
 
 
 app.post('/verify-code', async (req, res) => {
-  const { numero, codigo, instanciaId } = req.body;
+  const { numero, codigo } = req.body;
+  const instanciaId = await redis.get(`leadinst:${numero}`);
+if (!instanciaId) {
+  return res.status(400).json({ erro: 'Instância não encontrada para esse número' });
+}
+
 await redis.set(`instancia:${instanciaId}`, 'livre');
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
   const statusKey = `${numero}`;
@@ -206,8 +219,11 @@ await redis.set(`instancia:${instanciaId}`, 'livre');
 });
 
 app.post('/resend-code', async (req, res) => {
-  const { numero, instanciaId } = req.body;
+  const { numero } = req.body;
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+  const instanciaId = await redis.get(`instancia:${numero}`); // ou leadinst:${numero} se ainda usar
+if (!instanciaId) return res.status(400).json({ erro: 'Instância não encontrada' });
+
 
   if (!fs.existsSync(storageFile)) {
     return res.status(400).json({ erro: 'Sessão não encontrada' });

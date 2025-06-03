@@ -129,7 +129,11 @@ console.log('✅ Clicou no link da instância...');
         status = 'sms';
       } else {
         status = 'bloqueado';
-      } 
+      }
+    } else {
+      status = 'bloqueado';
+    }
+
     if (status === 'bloqueado') {
       await redis.set(statusKey, 'lotado', 'EX', 240);
       await redis.set(instanciaKey, 'livre');

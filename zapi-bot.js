@@ -117,25 +117,21 @@ console.log('✅ Clicou no link da instância...');
     let status = null;
     if (await aparece('text=Este número se encontra bloqueado')) {
       status = 'bloqueado';
-      console.log('numero bloqueado');
     } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
       status = 'wa_old';
-      console.log('wa_old');
     } else if (await aparece('button:has-text("Enviar sms")')) {
       await page.click('button:has-text("Enviar sms")');
-      console.log('enviar sms');
       await page.waitForTimeout(2000);
 
       if (await aparece('text=Este número se encontra bloqueado')) {
         status = 'bloqueado';
-        console.log('numero bloqueado 2');
       } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
         status = 'sms';
-        console.log('codigo sms');
       } else {
         status = 'bloqueado';
-      }
-      console.log('bloqueado');
+      } else {
+      status = 'bloqueado';
+    }
 
     if (status === 'bloqueado') {
       await redis.set(statusKey, 'lotado', 'EX', 240);

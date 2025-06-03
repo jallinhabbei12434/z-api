@@ -82,9 +82,11 @@ await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 await page.waitForSelector(`span.truncate.mr-2:has-text("${instanciaId}")`, { timeout: 3000 });
 
+const linkSelector = `a[href*="visualization/${instanciaId}"]`;
+
 console.log('🔎 Buscando link da instância...');
-const linkInstancia = await page.$(`a[href*="visualization/${instanciaId}"]`);
-if (!linkInstancia) {
+const linkExiste = await page.$(linkSelector);
+if (!linkExiste) {
   console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);
   await redis.set(statusKey, 'erro', 'EX', 240);
   await redis.set(instanciaKey, 'livre');
@@ -92,8 +94,8 @@ if (!linkInstancia) {
   return res.status(400).json({ erro: 'Instância não encontrada na interface' });
 }
 
-
-await linkInstancia.click();
+console.log('✅ Clicando no link da instância...');
+await page.click(linkSelector);
 console.log('✅ Clicou no link da instância...');
 
 

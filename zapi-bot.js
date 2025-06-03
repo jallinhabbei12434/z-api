@@ -156,7 +156,7 @@ async function executarBot(numero, res) {
         await redis.set(statusKey, 'erro', 'EX', 240);
         await redis.del(instanciaKey);
         await browser.close();
-        return res.json({ status: 'error' });
+        return res.json({ status: 'lotado' });
       }
     }
   } catch (err) {

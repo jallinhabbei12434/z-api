@@ -85,7 +85,7 @@ await page.waitForSelector(`span.truncate.mr-2:has-text("${instanciaId}")`, { ti
 console.log('🔎 Buscando link da instância...');
 const linkInstancia = await page.click(`a[href*="visualization}"]`);
 if (!linkInstancia) {
-  console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);Add commentMore actions
+  console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);
   await redis.set(statusKey, 'erro', 'EX', 240);
   await redis.set(instanciaKey, 'livre');
   await browser.close();

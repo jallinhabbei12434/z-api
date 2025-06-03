@@ -30,10 +30,10 @@ async function enviarWebhook(url, dados) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-const executarBot = async (numero, res) => {
+
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
-
+const executarBot = async (numero, res) => {
   const timeout = 25000; // 25 segundos
   try {
     await Promise.race([
@@ -202,10 +202,8 @@ process.stdout.write('');
     res.status(500).json({ erro: true });
   }
   throw new Error('Status desconhecido ou nenhum retorno válido');
-}
-}
-});
 };
+});
 app.post('/verify-code', async (req, res) => {
   const { numero, codigo } = req.body;
   const instanciaId = await redis.get(`leadinst:${numero}`);

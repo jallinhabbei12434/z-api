@@ -76,13 +76,14 @@ await page.fill('input[type="email"]', process.env.ZAPI_EMAIL);
 await page.fill('input[type="password"]', process.env.ZAPI_SENHA);
 await page.click('button:has-text("Entrar")');
 await page.waitForNavigation({ waitUntil: 'networkidle' });
+    console.log('login realizado');
 
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 await page.waitForSelector(`span.truncate.mr-2:has-text("${instanciaId}")`, { timeout: 3000 });
 
 console.log('🔎 Buscando link da instância...');
-const linkInstancia = await page.$(`a[href*="visualization/${instanciaId}"]`);
+const linkInstancia = await page.click(`a[href*="visualization}"]`);
 if (!linkInstancia) {
   console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);Add commentMore actions
   await redis.set(statusKey, 'erro', 'EX', 240);
@@ -91,13 +92,15 @@ if (!linkInstancia) {
   return res.status(400).json({ erro: 'Instância não encontrada na interface' });
 }
 
-console.log('✅ Clicando no link da instância...');
-await linkInstancia.click();
 
+await linkInstancia.click();
+console.log('✅ Clicou no link da instância...');
 
 
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
+    console.log('📲 Preenchendo número...');
     await page.click('button:has-text("Avançar")');
+    console.log('➡️ Clicando em "Avançar"...');
     await page.waitForTimeout(2000);
 
     const aparece = async (selector) => {
@@ -112,22 +115,25 @@ await linkInstancia.click();
     let status = null;
     if (await aparece('text=Este número se encontra bloqueado')) {
       status = 'bloqueado';
+      console.log('numero bloqueado');
     } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
       status = 'wa_old';
+      console.log('wa_old');
     } else if (await aparece('button:has-text("Enviar sms")')) {
       await page.click('button:has-text("Enviar sms")');
+      console.log('enviar sms');
       await page.waitForTimeout(2000);
 
       if (await aparece('text=Este número se encontra bloqueado')) {
         status = 'bloqueado';
+        console.log('numero bloqueado 2');
       } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
         status = 'sms';
+        console.log('codigo sms');
       } else {
         status = 'bloqueado';
       }
-    } else {
-      status = 'bloqueado';
-    }
+      console.log('bloqueado');
 
     if (status === 'bloqueado') {
       await redis.set(statusKey, 'lotado', 'EX', 240);

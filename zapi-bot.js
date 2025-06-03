@@ -29,7 +29,7 @@ async function enviarWebhook(url, dados) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-
+async function executarBot(numero, res) {
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
@@ -45,9 +45,8 @@ app.post('/start-bot', async (req, res) => {
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     res.status(500).json({ erro: true });
   }
-async function executarBot(numero, res) {
+
   let instanciaId = null;
-  let browser;
   
 
   for (const id of instancias) {
@@ -207,7 +206,7 @@ process.stdout.write('');
   throw new Error('Status desconhecido ou nenhum retorno válido');
 }
 });
-
+}
 
 app.post('/verify-code', async (req, res) => {
   const { numero, codigo } = req.body;

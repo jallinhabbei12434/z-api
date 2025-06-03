@@ -30,9 +30,7 @@ async function enviarWebhook(url, dados) {
     console.error('Erro ao enviar webhook:', err.message);
   }
 }
-async function executarBot(numero, res) {
-  let instanciaId = null;
-  let browser;
+const executarBot = async (numero, res) => {
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
@@ -207,7 +205,7 @@ process.stdout.write('');
 }
 }
 });
-
+};
 app.post('/verify-code', async (req, res) => {
   const { numero, codigo } = req.body;
   const instanciaId = await redis.get(`leadinst:${numero}`);

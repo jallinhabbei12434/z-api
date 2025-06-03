@@ -80,13 +80,17 @@ await page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
-const instanciaLink = await page.locator('span.truncate.mr-2').filter({
-  hasText: instanciaId,
-}).first();
-    // Verifica se a instância desejada está visível
-await instanciaLink.scrollIntoViewIfNeeded(); // scrolla até o span
-await instanciaLink.screenshot({ path: `debug-span.png` });
-    
+const spans = await page.$$('span.truncate.mr-2');
+let instanciaLink = null;
+
+for (const span of spans) {
+  const content = await span.textContent();
+  if (content && content.trim() === instanciaId) {
+    instanciaLink = span;
+    break;
+  }
+}
+
 if (!instanciaLink) {
   console.error(`❌ Instância ${instanciaId} não encontrada na página da Z-API`);
   await redis.set(statusKey, 'erro', 'EX', 240);
@@ -95,18 +99,12 @@ if (!instanciaLink) {
   return;
 }
 
+// Scrolla e clica
+await instanciaLink.scrollIntoViewIfNeeded();
 await instanciaLink.evaluate(el => {
   const link = el.closest('a');
   if (link) link.click();
 });
-
-
-// Clica no <a> pai do <span> com o ID
-await instanciaLink.evaluate(el => {
-  const link = el.closest('a');
-  if (link) link.click();
-});
-
 
 await instanciaAlvo.click();
 

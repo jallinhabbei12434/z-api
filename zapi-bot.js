@@ -80,9 +80,9 @@ await page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
-const spans = await page.$$('span.truncate.mr-2');
-let instanciaLink = null;
-
+const instanciaLink = await page.locator('span.truncate.mr-2').filter({
+  hasText: '3E1CDD7...'
+}).first();
 for (const span of spans) {
   const content = await span.textContent();
   if (content && content.trim() === instanciaId) {

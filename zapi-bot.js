@@ -41,12 +41,12 @@ app.post('/start-bot', async (req, res) => {
       new Promise((_, reject) => setTimeout(() => reject(new Error('⏰ Timeout de execução')), timeout))
     ]);
   } 
-  const executarBot = async (numero, res) => {
     catch (err) {
     console.error('Erro geral:', err.message);
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     res.status(500).json({ erro: true });
   }  
+  const executarBot = async (numero, res) => {
 
   for (const id of instancias) {
     const status = await redis.get(`instancia:${id}`);

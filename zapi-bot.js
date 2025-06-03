@@ -79,27 +79,12 @@ await page.waitForNavigation({ waitUntil: 'networkidle' });
 
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
+await page.waitForSelector('text=instanciaId', { timeout: 3000 });
 
-const spans = await page.$$('span.truncate.mr-2');
-let instanciaLink;
+console.log('Clicando na instância...');
+process.stdout.write('');
+    await page.click('a[href*="visualization"]');
 
-for (const span of spans) {
-  const content = await span.textContent();
-  if (content && content.trim() === instanciaId) {
-    instanciaLink = span;
-    break;
-  }
-}
-
-if (!instanciaLink) {
-  console.error(`❌ Instância ${instanciaId} não encontrada na página da Z-API`);
-  await redis.set(statusKey, 'erro', 'EX', 240);
-  await redis.set(`instancia:${instanciaId}`, 'livre');
-  await browser.close();
-  return;
-}
-
-await instanciaLink.click();
 
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
     await page.click('button:has-text("Avançar")');

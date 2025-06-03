@@ -81,7 +81,7 @@ await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
 
 const instanciaLink = await page.locator('span.truncate').filter({
-  hasText: instanciaId.slice(0, 6) // pega os primeiros 6~8 caracteres visíveis
+  hasText: new RegExp(`^${instanciaId.slice(0, 6)}`) // pega os primeiros 6 caracteres visíveis
 }).first();
     // Verifica se a instância desejada está visível
 await instanciaLink.scrollIntoViewIfNeeded(); // scrolla até o span

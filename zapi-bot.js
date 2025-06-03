@@ -79,7 +79,7 @@ await page.waitForNavigation({ waitUntil: 'networkidle' });
 
 await page.goto('https://app.z-api.io/app/devices');
 await page.waitForSelector('text=Desconectada', { timeout: 3000 });
-await page.waitForSelector('text=instanciaId', { timeout: 3000 });
+await page.waitForSelector(`span.truncate.mr-2:has-text("${instanciaId}")`, { timeout: 3000 });
 
 console.log('Clicando na instância...');
 process.stdout.write('');

@@ -109,29 +109,40 @@ async function executarBot(numero, res) {
 
     let status = null;
     if (await aparece('text=Este número se encontra bloqueado')) {
-      status = 'bloqueado';
-    } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-      status = 'wa_old';
-    } else if (await aparece('button:has-text("Enviar sms")')) {
-      await page.click('button:has-text("Enviar sms")');
-      await page.waitForTimeout(2000);
-      if (await aparece('text=Este número se encontra bloqueado')) {
-        status = 'bloqueado';
-      } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-        status = 'sms';
-      } else {
-        status = 'bloqueado';
-      }
-    } else {
-      status = 'bloqueado';
-    }
+  status = 'bloqueado';
+} else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+  status = 'wa_old';
+} else if (await aparece('button:has-text("Enviar sms")')) {
+  console.log('Botão "Enviar sms" detectado. Clicando...');
+  process.stdout.write('');
+  await page.click('button:has-text("Enviar sms")');
+
+  console.log('Aguardando reação após clique em Enviar SMS...');
+  process.stdout.write('');
+  await page.waitForTimeout(2000);
+
+  if (await aparece('text=Este número se encontra bloqueado')) {
+    console.log(' NUMERO bloqueado.');
+  process.stdout.write('');
+    status = 'bloqueado';
+  } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
+    console.log('SMS ENVIADO.');
+  process.stdout.write('');
+    status = 'sms';
+} else {
+  console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
+  process.stdout.write('');
+  status = 'bloqueado';
+}
 
     if (status === 'bloqueado') {
+      console.log('Bloqueado.');
+  process.stdout.write('');
       await redis.set(statusKey, 'lotado', 'EX', 240);
       await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
-      return res.json({ status: 'bloqueado' });
+      return res.json({ status: 'lotado' });
     }
 
     if (status === 'sms') {
@@ -140,12 +151,12 @@ async function executarBot(numero, res) {
         await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
         await context.storageState({ path: storageFile });
         await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
-        return res.json({ status: 'aguardando_codigo' });
+        return res.json({ status: 'ok' });
       } catch (e) {
         await redis.set(statusKey, 'erro', 'EX', 240);
         await redis.del(instanciaKey);
         await browser.close();
-        return res.json({ status: 'bloqueado' });
+        return res.json({ status: 'error' });
       }
     }
   } catch (err) {

@@ -116,7 +116,7 @@ async function executarBot(numero, res) {
 } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
   console.log('SOLITICTOU EM WA_OLD.');
   process.stdout.write('');
-      status = 'sms';
+      status = 'wa_old';
 } else if (await aparece('button:has-text("Enviar sms")')) {
   console.log('Botão "Enviar sms" detectado. Clicando...');
   process.stdout.write('');

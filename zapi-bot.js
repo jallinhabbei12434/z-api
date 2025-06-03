@@ -17,10 +17,8 @@ const sessions = {};
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
-async function executarBot(numero, res) {
-  let instanciaId = null;
-  let browser;
-}
+
+
 async function enviarWebhook(url, dados) {
   try {
     await fetch(url, {
@@ -33,6 +31,8 @@ async function enviarWebhook(url, dados) {
   }
 }
 async function executarBot(numero, res) {
+  let instanciaId = null;
+  let browser;
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
@@ -294,4 +294,5 @@ app.get('/ping', (_, res) => res.send('pong'));
 
 app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
   console.log(`HTTP ON ${process.env.PORT || 3000}`);
+}
 });

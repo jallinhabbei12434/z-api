@@ -17,12 +17,11 @@ const sessions = {};
 function sleep(ms) {
   return new Promise((res) => setTimeout(res, ms));
 }
-
 async function executarBot(numero, res) {
   let instanciaId = null;
   let browser;
 }
-
+async function enviarWebhook(url, dados) {
   try {
     await fetch(url, {
       method: 'POST',

@@ -99,22 +99,21 @@ await page.click(linkSelector);
 console.log('✅ Clicou no link da instância...');
 
 
+    console.log('Preenchendo número...');
+process.stdout.write('');
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
-    console.log('📲 Preenchendo número...');
+
+    console.log('Clicando em Avançar...');
+process.stdout.write('');
     await page.click('button:has-text("Avançar")');
-    console.log('➡️ Clicando em "Avançar"...');
     await page.waitForTimeout(2000);
 
-    const aparece = async (selector) => {
-      try {
-        await page.waitForSelector(selector, { timeout: 2000 });
-        return true;
-      } catch (_) {
-        return false;
-      }
-    };
+    const bloqueioSelector = 'text=Este número se encontra bloqueado';
+    const smsBtn = 'button:has-text("Enviar sms")';
+    const codigoInput = 'input[placeholder*="Código de confirmação"]';
 
     let status = null;
+    
     if (await aparece('text=Este número se encontra bloqueado')) {
       status = 'bloqueado';
     } else if (await aparece('input[placeholder*="Código de confirmação"]')) {

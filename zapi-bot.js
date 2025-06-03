@@ -133,8 +133,7 @@ async function executarBot(numero, res) {
   console.log('⚠️ Nenhum estado reconhecido após avançar. Considerando bloqueado.');
   process.stdout.write('');
   status = 'bloqueado';
-} else {
-   status = 'bloqueado';
+} 
 }
 
     if (status === 'bloqueado') {

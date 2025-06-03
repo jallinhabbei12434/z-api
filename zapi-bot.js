@@ -106,12 +106,17 @@ async function executarBot(numero, res) {
     await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
     await page.click('button:has-text("Avançar")');
     await page.waitForTimeout(2000);
+    console.log('Clicou em avançar!');
 
     let status = null;
     if (await aparece('text=Este número se encontra bloqueado')) {
-  status = 'bloqueado';
+  console.log(' NUMERO bloqueado.');
+  process.stdout.write('');
+      status = 'bloqueado';
 } else if (await aparece('input[placeholder*="Código de confirmação"]')) {
-  status = 'wa_old';
+  console.log('SOLITICTOU EM WA_OLD.');
+  process.stdout.write('');
+      status = 'sms';
 } else if (await aparece('button:has-text("Enviar sms")')) {
   console.log('Botão "Enviar sms" detectado. Clicando...');
   process.stdout.write('');

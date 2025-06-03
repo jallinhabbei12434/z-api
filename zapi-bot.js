@@ -31,6 +31,8 @@ async function enviarWebhook(url, dados) {
   }
 }
 async function executarBot(numero, res) {
+  let instanciaId = null;
+  let browser;
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
@@ -203,6 +205,7 @@ process.stdout.write('');
   }
   throw new Error('Status desconhecido ou nenhum retorno válido');
 }
+}
 });
 
 app.post('/verify-code', async (req, res) => {
@@ -293,5 +296,4 @@ app.get('/ping', (_, res) => res.send('pong'));
 
 app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
   console.log(`HTTP ON ${process.env.PORT || 3000}`);
-}
 });

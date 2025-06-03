@@ -31,8 +31,6 @@ async function enviarWebhook(url, dados) {
   }
 }
 async function executarBot(numero, res) {
-  let instanciaId = null;
-  let browser;
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;
 
@@ -55,7 +53,8 @@ app.post('/start-bot', async (req, res) => {
       break;
     }
   }
-
+let instanciaId = null;
+  
   if (!instanciaId) {
     await redis.set(`${numero}`, 'lotado', 'EX', 240);
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });

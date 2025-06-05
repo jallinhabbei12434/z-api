@@ -218,9 +218,13 @@ await redis.set(`instancia:${instanciaId}`, 'livre');
     const page = await context.newPage();
 
     await page.waitForSelector('input[placeholder*="Código de confirmação"]');
+    console.log('preenchendo codigo');
+  process.stdout.write('');
     await page.fill('input[placeholder*="Código de confirmação"]', code);
+    console.log('codigo preenchido');
+  process.stdout.write('');
     await page.click('button:has-text("Confirmar")');
-    console.log('CÓDIGO PREENCHIDO.');
+    console.log('CÓDIGO em confirmacao.');
       process.stdout.write('');
 
     await sleep(3000);
@@ -256,10 +260,10 @@ if (!instanciaId) return res.status(400).json({ erro: 'Instância não encontrad
     await page.waitForSelector('span.cursor-pointer:has-text("Alterar")', { timeout: 1500 });
     await page.click('span.cursor-pointer:has-text("Alterar")');
 
-    await page.waitForSelector('input[type="tel"]', { timeout: 1500 });
-    await page.fill('input[type="tel"]', numero);
+    await page.fill('input.PhoneInputInput', `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`);
     await page.click('button:has-text("Avançar")');
-    await page.waitForTimeout(7000);
+    await page.waitForTimeout(2000);
+    console.log('Clicou em avançar!');
 
     const campoCodigo = await page.$('input[placeholder*="confirmação"]');
     if (campoCodigo) {

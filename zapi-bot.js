@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const Redis = require('ioredis');
 const redis = new Redis(process.env.REDIS_URL);
+const REDIS_TTL_MS = parseInt(process.env.REDIS_TTL_MS || '240000', 10);
+const REDIS_TTL_SEC = Math.floor(REDIS_TTL_MS / 1000);
 const app = express();
 const instancias = process.env.INSTANCIAS.split(',');
 
@@ -41,7 +43,7 @@ async function executarBot(numero, res) {
   }
 
   if (!instanciaId) {
-    await redis.set(`${numero}`, 'lotado', 'EX', 240);
+    await redis.set(`${numero}`, 'lotado', 'EX', REDIS_TTL_SEC);
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
@@ -52,14 +54,14 @@ async function executarBot(numero, res) {
 
   const emUso = await redis.get(instanciaKey);
   if (emUso && emUso !== 'livre') {
-    await redis.set(statusKey, 'lotado', 'EX', 240);
+    await redis.set(statusKey, 'lotado', 'EX', REDIS_TTL_SEC);
     await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
     return res.json({ status: 'lotado' });
   }
 
-  await redis.set(instanciaKey, numero, 'EX', 240);
-  await redis.set(statusKey, 'pendente', 'EX', 240);
-  await redis.set(`leadinst:${numero}`, instanciaId, 'EX', 240);
+  await redis.set(instanciaKey, numero, 'EX', REDIS_TTL_SEC);
+  await redis.set(statusKey, 'pendente', 'EX', REDIS_TTL_SEC);
+  await redis.set(`leadinst:${numero}`, instanciaId, 'EX', REDIS_TTL_SEC);
 
   let browser;
   try {
@@ -93,7 +95,7 @@ async function executarBot(numero, res) {
     const linkExiste = await page.$(linkSelector);
     if (!linkExiste) {
       console.error(`❌ Link da instância ${instanciaId} não encontrado na Z-API`);
-      await redis.set(statusKey, 'erro', 'EX', 240);
+      await redis.set(statusKey, 'erro', 'EX', REDIS_TTL_SEC);
       await redis.set(instanciaKey, 'livre');
       await browser.close();
       return res.status(400).json({ erro: 'Instância não encontrada na interface' });
@@ -144,7 +146,7 @@ async function executarBot(numero, res) {
     if (status === 'bloqueado') {
       console.log('Bloqueado.');
   process.stdout.write('');
-      await redis.set(statusKey, 'lotado', 'EX', 240);
+      await redis.set(statusKey, 'lotado', 'EX', REDIS_TTL_SEC);
       await redis.set(instanciaKey, 'livre');
       await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'lotado' });
       await browser.close();
@@ -154,12 +156,12 @@ async function executarBot(numero, res) {
     if (status === 'sms') {
       try {
         await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
-        await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
+        await redis.set(statusKey, 'aguardando_codigo', 'EX', REDIS_TTL_SEC);
         await context.storageState({ path: storageFile });
         await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
         return res.json({ status: 'ok' });
       } catch (e) {
-        await redis.set(statusKey, 'erro', 'EX', 240);
+        await redis.set(statusKey, 'erro', 'EX', REDIS_TTL_SEC);
         await redis.del(instanciaKey);
         await browser.close();
         return res.json({ status: 'lotado' });
@@ -167,7 +169,7 @@ async function executarBot(numero, res) {
     }
   if (status === 'wa_old') {
   console.log('⚠️ Código de verificação via WhatsApp detectado (wa_old)');
-  await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
+  await redis.set(statusKey, 'aguardando_codigo', 'EX', REDIS_TTL_SEC);
   await context.storageState({ path: storageFile });
   await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
   await browser.close();
@@ -175,7 +177,7 @@ async function executarBot(numero, res) {
 }
 } catch (err) {
     console.error('Erro no bot:', err);
-    await redis.set(`${numero}`, 'erro', 'EX', 240);
+    await redis.set(`${numero}`, 'erro', 'EX', REDIS_TTL_SEC);
     if (browser) await browser.close();
     return res.status(500).json({ erro: true });
   }
@@ -192,58 +194,39 @@ app.post('/start-bot', async (req, res) => {
     ]);
   } catch (err) {
     console.error('Erro geral:', err.message);
-    await redis.set(`${numero}`, 'erro', 'EX', 240);
+    await redis.set(`${numero}`, 'erro', 'EX', REDIS_TTL_SEC);
     res.status(500).json({ erro: true });
   }
 });
 app.post('/verify-code', async (req, res) => {
   const { numero, code } = req.body;
-  const instanciaId = await redis.get(`leadinst:${numero}`);
-if (!instanciaId) {
-  return res.status(400).json({ erro: 'Instância não encontrada para esse número' });
-}
+  const session = sessions[numero];
+  if (!session) return res.status(404).json({ erro: 'Sessão não encontrada' });
 
-await redis.set(`instancia:${instanciaId}`, 'livre');
-  const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
+  const { page, browser, instanciaId } = session;
   const statusKey = `${numero}`;
 
-  if (!fs.existsSync(storageFile)) {
-    return res.status(404).json({ erro: 'Sessão não encontrada' });
-  }
-
-  let browser;
   try {
-    browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext({ storageState: storageFile });
-    const page = await context.newPage();
-
-    await page.waitForSelector('input[placeholder*="Código de confirmação"]');
-    console.log('preenchendo codigo');
-  process.stdout.write('');
     await page.fill('input[placeholder*="Código de confirmação"]', code);
-    console.log('codigo preenchido');
-  process.stdout.write('');
     await page.click('button:has-text("Confirmar")');
-    console.log('CÓDIGO em confirmacao.');
-      process.stdout.write('');
 
     await sleep(3000);
-    await redis.set(statusKey, 'ok', 'EX', 240);
-    await redis.set(`instancia:${sessions[numero].instanciaId}`, 'conectado');
+    await redis.set(statusKey, 'ok', 'EX', REDIS_TTL_SEC);
+    await redis.set(`instancia:${instanciaId}`, 'conectado');
 
     res.json({ status: 'ok' });
   } catch (err) {
-  console.error('Erro ao verificar código:', err);
-  await redis.set(statusKey, 'erro', 'EX', 240);
-  await redis.set(`instancia:${instanciaId}`, 'livre'); // ⬅ importante aqui também
-  res.status(500).json({ erro: true });
-}
+    console.error('Erro ao verificar código:', err);
+    await redis.set(statusKey, 'erro', 'EX', REDIS_TTL_SEC);
+    await redis.set(`instancia:${instanciaId}`, 'livre');
+    res.status(500).json({ erro: true });
+  }
 });
 
 app.post('/resend-code', async (req, res) => {
   const { numero } = req.body;
   const storageFile = path.resolve(__dirname, 'sessions', `${numero}.json`);
-  const instanciaId = await redis.get(`instancia:${numero}`); // ou leadinst:${numero} se ainda usar
+  const instanciaId = await redis.get(`leadinst:${numero}`);
 if (!instanciaId) return res.status(400).json({ erro: 'Instância não encontrada' });
 
 
@@ -268,15 +251,15 @@ if (!instanciaId) return res.status(400).json({ erro: 'Instância não encontrad
     const campoCodigo = await page.$('input[placeholder*="confirmação"]');
     if (campoCodigo) {
       await context.storageState({ path: storageFile });
-      await redis.set(`${numero}`, "aguardando_codigo", "EX", 240);
+      await redis.set(`${numero}`, "aguardando_codigo", "EX", REDIS_TTL_SEC);
       return res.status(200).json({ reenviado: true });
     } else {
-      await redis.set(`${numero}`, "erro", "EX", 240);
+      await redis.set(`${numero}`, "erro", "EX", REDIS_TTL_SEC);
       return res.status(400).json({ erro: 'Falha ao reenviar código' });
     }
   } catch (err) {
     console.error("Erro no /resend-code:", err.message);
-    await redis.set(`${numero}`, "erro", "EX", 240);
+    await redis.set(`${numero}`, "erro", "EX", REDIS_TTL_SEC);
     return res.status(500).json({ erro: 'Erro ao reenviar' });
   } finally {
     await browser.close();

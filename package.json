@@ -1,10 +1,10 @@
 {
   "name": "zapi-bot",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "zapi-bot.js",
   "scripts": {
     "postinstall": "npx playwright install chromium && npx playwright install-deps || true",
-    "start": "node server.js"
+    "start": "node zapi-bot.js"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

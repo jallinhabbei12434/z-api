@@ -164,6 +164,7 @@ async function executarBot(numero, res) {
         await browser.close();
         return res.json({ status: 'lotado' });
       }
+    }
       if (status === 'wa_old') {
       try {
         await page.waitForSelector('input[placeholder*="Código de confirmação"]', { timeout: 7000 });
@@ -177,13 +178,12 @@ async function executarBot(numero, res) {
         await browser.close();
         return res.json({ status: 'lotado' });
       }
-    } catch (err) {
+      } catch (err) {
     console.error('Erro no bot:', err);
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     if (browser) await browser.close();
     return res.status(500).json({ erro: true });
   }
-}
 
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;

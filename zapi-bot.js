@@ -69,6 +69,15 @@ async function executarBot(numero, res) {
     const context = await browser.newContext();
     const page = await context.newPage();
     sessions[numero] = { browser, context, page, instanciaId };
+    sessions[numero].timeout = setTimeout(async () => {
+      try {
+        await browser.close();
+      } catch (err) {
+        console.error('Erro ao fechar navegador por timeout:', err.message);
+      }
+      delete sessions[numero];
+      await redis.del(`instancia:${instanciaId}`);
+    }, REDIS_TTL_MS);
 
     const aparece = async (seletor) => {
       try {
@@ -172,13 +181,16 @@ async function executarBot(numero, res) {
   await redis.set(statusKey, 'aguardando_codigo', 'EX', REDIS_TTL_SEC);
   await context.storageState({ path: storageFile });
   await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
-  await browser.close();
   return res.json({ status: 'ok' });
 }
 } catch (err) {
     console.error('Erro no bot:', err);
     await redis.set(`${numero}`, 'erro', 'EX', REDIS_TTL_SEC);
-    if (browser) await browser.close();
+    if (browser) {
+      clearTimeout(sessions[numero]?.timeout);
+      await browser.close();
+      delete sessions[numero];
+    }
     return res.status(500).json({ erro: true });
   }
 }
@@ -220,6 +232,10 @@ app.post('/verify-code', async (req, res) => {
     await redis.set(statusKey, 'erro', 'EX', REDIS_TTL_SEC);
     await redis.set(`instancia:${instanciaId}`, 'livre');
     res.status(500).json({ erro: true });
+  } finally {
+    clearTimeout(session.timeout);
+    await browser.close();
+    delete sessions[numero];
   }
 });
 

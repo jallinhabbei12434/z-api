@@ -197,7 +197,7 @@ app.post('/start-bot', async (req, res) => {
   }
 });
 app.post('/verify-code', async (req, res) => {
-  const { numero, codigo } = req.body;
+  const { numero, code } = req.body;
   const instanciaId = await redis.get(`leadinst:${numero}`);
 if (!instanciaId) {
   return res.status(400).json({ erro: 'Instância não encontrada para esse número' });
@@ -218,7 +218,7 @@ await redis.set(`instancia:${instanciaId}`, 'livre');
     const page = await context.newPage();
 
     await page.waitForSelector('input[placeholder*="Código de confirmação"]');
-    await page.fill('input[placeholder*="Código de confirmação"]', codigo);
+    await page.fill('input[placeholder*="Código de confirmação"]', code);
     await page.click('button:has-text("Confirmar")');
     console.log('CÓDIGO PREENCHIDO.');
       process.stdout.write('');

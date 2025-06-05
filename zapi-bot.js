@@ -177,8 +177,7 @@ async function executarBot(numero, res) {
         await browser.close();
         return res.json({ status: 'lotado' });
       }
-    }
-  } catch (err) {
+    } catch (err) {
     console.error('Erro no bot:', err);
     await redis.set(`${numero}`, 'erro', 'EX', 240);
     if (browser) await browser.close();

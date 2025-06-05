@@ -164,18 +164,22 @@ async function executarBot(numero, res) {
         await browser.close();
         return res.json({ status: 'lotado' });
       }
-    } else {
-      await redis.set(statusKey, 'erro', 'EX', 240);
-      await redis.del(instanciaKey);
-      await browser.close();
-      return;
     }
-  } catch (err) {
+  if (status === 'wa_old') {
+  console.log('⚠️ Código de verificação via WhatsApp detectado (wa_old)');
+  await redis.set(statusKey, 'aguardando_codigo', 'EX', 240);
+  await context.storageState({ path: storageFile });
+  await enviarWebhook(process.env.WEBHOOK_DISPONIBILIDADE, { numero, disponibilidade: 'ok' });
+  await browser.close();
+  return res.json({ status: 'ok' });
+}
+} catch (err) {
     console.error('Erro no bot:', err);
-    await redis.set(statusKey, 'erro', 'EX', 240);
-    await redis.del(instanciaKey);
-    res.status(500).json({ erro: true });
+    await redis.set(`${numero}`, 'erro', 'EX', 240);
+    if (browser) await browser.close();
+    return res.status(500).json({ erro: true });
   }
+}
 
 app.post('/start-bot', async (req, res) => {
   const { numero } = req.body;

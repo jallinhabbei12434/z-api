@@ -247,7 +247,7 @@ app.post('/verify-code', async (req, res) => {
       const novoStatus = atual === 'aguardando_codigo' ? 'aguardando_codigo' : 'erro';
       await redis.set(statusKey, novoStatus, 'EX', REDIS_TTL_SEC);
       await redis.set(`instancia:${instanciaId}`, 'livre');
-      return res.status(400).json({ erro: 'codigo_incorreto' });
+      return res.json({ status: 'codigo_incorreto' });
     }
 
     await redis.set(statusKey, 'ok', 'EX', REDIS_TTL_SEC);

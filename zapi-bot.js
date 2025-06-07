@@ -222,7 +222,34 @@ app.post('/verify-code', async (req, res) => {
     await page.fill('input[placeholder*="Código de confirmação"]', code);
     await page.click('button:has-text("Confirmar")');
 
-    await sleep(3000);
+    // Aguarda até 5s por alguma mudança na tela apos confirmar o codigo
+    try {
+      await page.waitForSelector('div[role="status"]', { timeout: 5000 });
+    } catch {
+      await page.waitForTimeout(5000);
+    }
+
+    const campoCodigo = await page.$('input[placeholder*="Código de confirmação"]');
+    const divStatus = await page.$('div[role="status"][aria-live="polite"]');
+    let codigoFalhou = false;
+
+    if (campoCodigo) {
+      codigoFalhou = true;
+    } else if (divStatus) {
+      const txt = (await divStatus.textContent()) || '';
+      if (txt.includes('Código incorreto. Verifique e tente novamente.')) {
+        codigoFalhou = true;
+      }
+    }
+
+    if (codigoFalhou) {
+      const atual = await redis.get(statusKey);
+      const novoStatus = atual === 'aguardando_codigo' ? 'aguardando_codigo' : 'erro';
+      await redis.set(statusKey, novoStatus, 'EX', REDIS_TTL_SEC);
+      await redis.set(`instancia:${instanciaId}`, 'livre');
+      return res.status(400).json({ erro: 'codigo_incorreto' });
+    }
+
     await redis.set(statusKey, 'ok', 'EX', REDIS_TTL_SEC);
     await redis.set(`instancia:${instanciaId}`, 'conectado');
 
